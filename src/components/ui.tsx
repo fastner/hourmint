@@ -5,6 +5,7 @@ import {
   useContext,
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type ButtonHTMLAttributes,
@@ -333,16 +334,25 @@ export function Modal({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const titleId = useId();
+  // Parents often pass a new inline onClose on every render; keep the latest one in a ref so the
+  // focus effect below only re-runs when `open` changes and never steals focus mid-typing (#10).
+  const onCloseRef = useRef(onClose);
+  useLayoutEffect(() => {
+    onCloseRef.current = onClose;
+  });
   useEffect(() => {
     if (!open) return;
     const prev = document.activeElement as HTMLElement | null;
     const el = ref.current;
-    const first = el?.querySelector<HTMLElement>("[autofocus], input, select, textarea, button:not([data-close])");
-    first?.focus();
+    // A React autoFocus child is already focused during commit; leave focus where it is then.
+    if (!el?.contains(document.activeElement)) {
+      const first = el?.querySelector<HTMLElement>("[autofocus], input, select, textarea, button:not([data-close])");
+      first?.focus();
+    }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.stopPropagation();
-        onClose();
+        onCloseRef.current();
       }
       if (e.key === "Tab" && el) {
         const items = Array.from(
@@ -367,7 +377,7 @@ export function Modal({
       document.removeEventListener("keydown", onKey, true);
       prev?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
   return createPortal(
