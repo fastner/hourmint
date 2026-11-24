@@ -81,7 +81,7 @@ The same code builds two ways. Only the direct download is published today.
 1. Fork the repo and create a branch from `main`.
 2. Make your change. Put UI text in `src/strings.ts` rather than inline.
 3. Add or update tests. Business logic in `src-tauri/src/services/` has unit tests next to it, and formatting helpers have Vitest tests.
-4. Run `npm run test:all`. CI runs the same checks on every pull request.
+4. Run `npm run test:all`, and `cargo fmt` in `src-tauri/` if you changed Rust code. CI runs the same checks on every pull request.
 5. For UI changes, add a before and after screenshot to the pull request. `npm run demo` is handy for this.
 6. Open the pull request and link the issue it fixes (`Fixes #123`).
 
