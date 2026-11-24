@@ -41,7 +41,10 @@ pub fn system_idle_seconds() -> f64 {
     extern "system" {
         fn GetTickCount() -> u32;
     }
-    let mut info = LastInputInfo { cb_size: std::mem::size_of::<LastInputInfo>() as u32, dw_time: 0 };
+    let mut info = LastInputInfo {
+        cb_size: std::mem::size_of::<LastInputInfo>() as u32,
+        dw_time: 0,
+    };
     unsafe {
         if GetLastInputInfo(&mut info) == 0 {
             return 0.0;
@@ -116,8 +119,16 @@ pub fn resolve(state: &AppState, action: &str) -> AppResult<()> {
 }
 
 /// The database side of an idle choice for the running entry `entry_id`.
-fn apply(c: &rusqlite::Connection, action: &str, entry_id: &str, since: DateTime<Utc>, now: DateTime<Utc>) -> AppResult<()> {
-    let Some(running) = entries::get_running(c)? else { return Ok(()) };
+fn apply(
+    c: &rusqlite::Connection,
+    action: &str,
+    entry_id: &str,
+    since: DateTime<Utc>,
+    now: DateTime<Utc>,
+) -> AppResult<()> {
+    let Some(running) = entries::get_running(c)? else {
+        return Ok(());
+    };
     if running.id != entry_id {
         return Ok(());
     }
@@ -147,7 +158,10 @@ fn notify(app: &AppHandle, title: &str, body: &str) {
 }
 
 pub fn spawn_monitor(app: AppHandle) {
-    log::info!("idle detection: system reports {:?}s since last input", system_idle_seconds());
+    log::info!(
+        "idle detection: system reports {:?}s since last input",
+        system_idle_seconds()
+    );
     std::thread::spawn(move || {
         let mut prev_tick = Utc::now();
         loop {
@@ -187,12 +201,18 @@ fn tick(app: &AppHandle, now: DateTime<Utc>, prev_tick: DateTime<Utc>) -> AppRes
     // Long-running timer warning, once per entry.
     if let Some(r) = &running {
         let limit = (s.long_timer_hours * 3600.0) as i64;
-        if limit > 0 && (now - r.started_at).num_seconds() >= limit && mon.long_warned_entry.as_ref() != Some(&r.id) {
+        if limit > 0
+            && (now - r.started_at).num_seconds() >= limit
+            && mon.long_warned_entry.as_ref() != Some(&r.id)
+        {
             mon.long_warned_entry = Some(r.id.clone());
             notify(
                 app,
                 "Timer still running",
-                &format!("Your timer has been running for over {} hours. Forgot to stop it?", s.long_timer_hours),
+                &format!(
+                    "Your timer has been running for over {} hours. Forgot to stop it?",
+                    s.long_timer_hours
+                ),
             );
         }
     }
@@ -217,7 +237,11 @@ fn tick(app: &AppHandle, now: DateTime<Utc>, prev_tick: DateTime<Utc>) -> AppRes
                     })?;
                     mon.last_reminder = Some(today);
                     if started_today == 0 {
-                        notify(app, "Time to start tracking", "No timer has been started today.");
+                        notify(
+                            app,
+                            "Time to start tracking",
+                            "No timer has been started today.",
+                        );
                     }
                 }
             }
@@ -225,7 +249,10 @@ fn tick(app: &AppHandle, now: DateTime<Utc>, prev_tick: DateTime<Utc>) -> AppRes
     }
 
     // Daily automatic backup, checked hourly.
-    if mon.last_backup_check.map_or(true, |t| now - t > Duration::hours(1)) {
+    if mon
+        .last_backup_check
+        .map_or(true, |t| now - t > Duration::hours(1))
+    {
         mon.last_backup_check = Some(now);
         let dir = state.paths.backup_dir.clone();
         if let Err(e) = state.with_db(|c| crate::db::daily_backup(c, &dir)) {
@@ -252,11 +279,25 @@ mod tests {
         let run = Some(("e1", start));
         // 11 minutes idle, threshold 10: record but don't prompt while still idle.
         let now = t("2026-01-01T10:00:00Z");
-        assert!(!idle_step(&mut st, run, 600, 660.0, now, now - Duration::seconds(5)));
+        assert!(!idle_step(
+            &mut st,
+            run,
+            600,
+            660.0,
+            now,
+            now - Duration::seconds(5)
+        ));
         assert_eq!(st.idle_since, Some(t("2026-01-01T09:49:00Z")));
         // User comes back.
         let later = t("2026-01-01T10:05:00Z");
-        assert!(idle_step(&mut st, run, 600, 1.0, later, later - Duration::seconds(5)));
+        assert!(idle_step(
+            &mut st,
+            run,
+            600,
+            1.0,
+            later,
+            later - Duration::seconds(5)
+        ));
         assert!(st.prompt_open);
         assert_eq!(st.idle_since, Some(t("2026-01-01T09:49:00Z")));
     }
@@ -280,7 +321,11 @@ mod tests {
         let (conn, pid) = setup();
         let e = entries::start_timer(
             &conn,
-            &StartTimerInput { project_id: pid, description: "x".into(), billable: true },
+            &StartTimerInput {
+                project_id: pid,
+                description: "x".into(),
+                billable: true,
+            },
             t("2026-01-01T09:00:00Z"),
         )
         .unwrap();
@@ -289,7 +334,9 @@ mod tests {
         apply(&conn, "discard", &e.id, since, now).unwrap();
         let first = entries::get_entry(&conn, &e.id).unwrap();
         assert_eq!(first.duration_seconds, 1800);
-        let next = entries::get_running(&conn).unwrap().expect("a new timer runs");
+        let next = entries::get_running(&conn)
+            .unwrap()
+            .expect("a new timer runs");
         assert_ne!(next.id, e.id);
         assert_eq!(parse_iso(&next.started_at).unwrap(), now);
         assert_eq!(next.description, "x");
@@ -302,12 +349,26 @@ mod tests {
         let (conn, pid) = setup();
         let e = entries::start_timer(
             &conn,
-            &StartTimerInput { project_id: pid, description: String::new(), billable: true },
+            &StartTimerInput {
+                project_id: pid,
+                description: String::new(),
+                billable: true,
+            },
             t("2026-01-01T09:00:00Z"),
         )
         .unwrap();
-        apply(&conn, "discard_stop", &e.id, t("2026-01-01T09:20:00Z"), t("2026-01-01T10:00:00Z")).unwrap();
-        assert_eq!(entries::get_entry(&conn, &e.id).unwrap().duration_seconds, 1200);
+        apply(
+            &conn,
+            "discard_stop",
+            &e.id,
+            t("2026-01-01T09:20:00Z"),
+            t("2026-01-01T10:00:00Z"),
+        )
+        .unwrap();
+        assert_eq!(
+            entries::get_entry(&conn, &e.id).unwrap().duration_seconds,
+            1200
+        );
         assert!(entries::get_running(&conn).unwrap().is_none());
     }
 }

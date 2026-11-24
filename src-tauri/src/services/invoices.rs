@@ -130,7 +130,10 @@ fn join_unique(items: impl Iterator<Item = String>) -> String {
 /// Derive invoice lines and totals from entries. Each entry's `rate` is the
 /// rate to bill (already snapshotted for invoiced entries).
 pub fn compute(entries: &[Entry], o: &ComputeOptions) -> AppResult<InvoiceComputation> {
-    let mut sorted: Vec<&Entry> = entries.iter().filter(|e| e.billable && e.ended_at.is_some()).collect();
+    let mut sorted: Vec<&Entry> = entries
+        .iter()
+        .filter(|e| e.billable && e.ended_at.is_some())
+        .collect();
     sorted.sort_by(|a, b| a.started_at.cmp(&b.started_at));
 
     // Group key → (sort key, description parts, seconds, rate)
@@ -144,7 +147,11 @@ pub fn compute(entries: &[Entry], o: &ComputeOptions) -> AppResult<InvoiceComput
     for e in &sorted {
         let date = local_date(parse_iso(&e.started_at)?);
         let (key, order, label) = match o.grouping {
-            "entry" => (e.id.clone(), format!("{}|{}", e.started_at, e.id), format_date(date, o.date_format)),
+            "entry" => (
+                e.id.clone(),
+                format!("{}|{}", e.started_at, e.id),
+                format_date(date, o.date_format),
+            ),
             "day" => (
                 format!("{}|{}", date, e.rate),
                 format!("{}|{:020}", date, e.rate),
@@ -159,7 +166,11 @@ pub fn compute(entries: &[Entry], o: &ComputeOptions) -> AppResult<InvoiceComput
             _ => return validation("Unknown grouping."),
         };
         let g = groups.entry(key).or_insert_with(|| Group {
-            order: if order.is_empty() { format!("{}|{}", e.started_at, e.project_id) } else { order },
+            order: if order.is_empty() {
+                format!("{}|{}", e.started_at, e.project_id)
+            } else {
+                order
+            },
             label,
             items: Vec::new(),
             rate: e.rate,
@@ -176,13 +187,21 @@ pub fn compute(entries: &[Entry], o: &ComputeOptions) -> AppResult<InvoiceComput
         let description = match o.grouping {
             "entry" => {
                 let e = g.items[0];
-                let what = if e.description.trim().is_empty() { e.project_name.clone() } else { format!("{} — {}", e.project_name, e.description.trim()) };
+                let what = if e.description.trim().is_empty() {
+                    e.project_name.clone()
+                } else {
+                    format!("{} — {}", e.project_name, e.description.trim())
+                };
                 format!("{} · {}", g.label, what)
             }
             "day" => {
                 let projects = join_unique(g.items.iter().map(|e| e.project_name.clone()));
                 let descs = join_unique(g.items.iter().map(|e| e.description.clone()));
-                if descs.is_empty() { format!("{} · {}", g.label, projects) } else { format!("{} · {}: {}", g.label, projects, descs) }
+                if descs.is_empty() {
+                    format!("{} · {}", g.label, projects)
+                } else {
+                    format!("{} · {}: {}", g.label, projects, descs)
+                }
             }
             _ => {
                 let first = local_date(parse_iso(&g.items[0].started_at)?);
@@ -190,7 +209,12 @@ pub fn compute(entries: &[Entry], o: &ComputeOptions) -> AppResult<InvoiceComput
                 if first == last {
                     format!("{} ({})", g.label, format_date(first, o.date_format))
                 } else {
-                    format!("{} ({} – {})", g.label, format_date(first, o.date_format), format_date(last, o.date_format))
+                    format!(
+                        "{} ({} – {})",
+                        g.label,
+                        format_date(first, o.date_format),
+                        format_date(last, o.date_format)
+                    )
                 }
             }
         };
@@ -206,7 +230,9 @@ pub fn compute(entries: &[Entry], o: &ComputeOptions) -> AppResult<InvoiceComput
 
     let subtotal: i64 = lines.iter().map(|l| l.amount).sum();
     let discount_amount = match o.discount_type {
-        "percent" => ((subtotal as f64) * o.discount_value.clamp(0.0, 100.0) / 100.0).round() as i64,
+        "percent" => {
+            ((subtotal as f64) * o.discount_value.clamp(0.0, 100.0) / 100.0).round() as i64
+        }
         "fixed" => (o.discount_value.max(0.0).round() as i64).min(subtotal),
         _ => 0,
     };
@@ -278,9 +304,14 @@ pub fn get_invoice(conn: &Connection, id: &str) -> AppResult<Invoice> {
 }
 
 fn invoice_entries(conn: &Connection, id: &str) -> AppResult<Vec<Entry>> {
-    let sql = format!("{} AND e.invoice_id = ?1 ORDER BY e.started_at", entries::ENTRY_SELECT);
+    let sql = format!(
+        "{} AND e.invoice_id = ?1 ORDER BY e.started_at",
+        entries::ENTRY_SELECT
+    );
     let mut stmt = conn.prepare(&sql)?;
-    let rows = stmt.query_map([id], entries::map_entry)?.collect::<Result<Vec<_>, _>>()?;
+    let rows = stmt
+        .query_map([id], entries::map_entry)?
+        .collect::<Result<Vec<_>, _>>()?;
     Ok(rows)
 }
 
@@ -302,7 +333,11 @@ pub fn get_detail(conn: &Connection, id: &str) -> AppResult<InvoiceDetail> {
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
-    Ok(InvoiceDetail { invoice, lines, entries: invoice_entries(conn, id)? })
+    Ok(InvoiceDetail {
+        invoice,
+        lines,
+        entries: invoice_entries(conn, id)?,
+    })
 }
 
 pub fn list(conn: &Connection, f: &InvoiceFilter) -> AppResult<Vec<Invoice>> {
@@ -315,7 +350,10 @@ pub fn list(conn: &Connection, f: &InvoiceFilter) -> AppResult<Vec<Invoice>> {
     if let Some(s) = &f.status {
         if s == "overdue" {
             vals.push(Box::new(chrono::Local::now().date_naive().to_string()));
-            sql.push_str(&format!(" AND i.status = 'sent' AND i.due_date < ?{}", vals.len()));
+            sql.push_str(&format!(
+                " AND i.status = 'sent' AND i.due_date < ?{}",
+                vals.len()
+            ));
         } else {
             vals.push(Box::new(s.clone()));
             sql.push_str(&format!(" AND i.status = ?{}", vals.len()));
@@ -324,7 +362,9 @@ pub fn list(conn: &Connection, f: &InvoiceFilter) -> AppResult<Vec<Invoice>> {
     sql.push_str(" ORDER BY i.issue_date DESC, i.created_at DESC");
     let mut stmt = conn.prepare(&sql)?;
     let params: Vec<&dyn ToSql> = vals.iter().map(|b| b.as_ref()).collect();
-    let rows = stmt.query_map(params.as_slice(), map_invoice)?.collect::<Result<Vec<_>, _>>()?;
+    let rows = stmt
+        .query_map(params.as_slice(), map_invoice)?
+        .collect::<Result<Vec<_>, _>>()?;
     Ok(rows)
 }
 
@@ -432,7 +472,10 @@ fn client_snapshot(conn: &Connection, client_id: &str) -> AppResult<serde_json::
 pub fn preview(conn: &Connection, input: &InvoiceInput) -> AppResult<InvoiceComputation> {
     let s = settings::get(conn)?;
     let candidates = candidate_entries(conn, &input.client_id, None, None, input.id.as_deref())?;
-    let selected: Vec<Entry> = candidates.into_iter().filter(|e| input.entry_ids.contains(&e.id)).collect();
+    let selected: Vec<Entry> = candidates
+        .into_iter()
+        .filter(|e| input.entry_ids.contains(&e.id))
+        .collect();
     compute(
         &selected,
         &ComputeOptions {
@@ -458,7 +501,9 @@ pub fn save_draft(conn: &Connection, input: &InvoiceInput) -> AppResult<InvoiceD
         Some(id) => {
             let inv = get_invoice(&tx, id)?;
             if inv.status != "draft" {
-                return validation("Only draft invoices can be edited. Move it back to draft first.");
+                return validation(
+                    "Only draft invoices can be edited. Move it back to draft first.",
+                );
             }
             if inv.client_id != input.client_id {
                 return validation("The client of an existing invoice cannot change.");
@@ -469,7 +514,11 @@ pub fn save_draft(conn: &Connection, input: &InvoiceInput) -> AppResult<InvoiceD
     };
 
     // Number: explicit override or generated from the pattern.
-    let requested = input.number.as_deref().map(str::trim).filter(|n| !n.is_empty());
+    let requested = input
+        .number
+        .as_deref()
+        .map(str::trim)
+        .filter(|n| !n.is_empty());
     let (number, used_seq) = match (requested, &existing) {
         (Some(n), _) => (n.to_string(), None),
         (None, Some(inv)) => (inv.number.clone(), None),
@@ -479,7 +528,9 @@ pub fn save_draft(conn: &Connection, input: &InvoiceInput) -> AppResult<InvoiceD
         }
     };
     if number_taken(&tx, &number, input.id.as_deref())? {
-        return Err(AppError::Conflict(format!("Invoice number {number} is already used.")));
+        return Err(AppError::Conflict(format!(
+            "Invoice number {number} is already used."
+        )));
     }
     // If the override happens to match the next generated number, advance the sequence too.
     let used_seq = used_seq.or_else(|| {
@@ -488,7 +539,10 @@ pub fn save_draft(conn: &Connection, input: &InvoiceInput) -> AppResult<InvoiceD
     });
 
     let now = time::now_iso();
-    let id = existing.as_ref().map(|i| i.id.clone()).unwrap_or_else(time::new_id);
+    let id = existing
+        .as_ref()
+        .map(|i| i.id.clone())
+        .unwrap_or_else(time::new_id);
     let sender = sender_snapshot(&tx)?.to_string();
     let client_snap = client_snapshot(&tx, &input.client_id)?.to_string();
 
@@ -654,7 +708,10 @@ pub fn timesheet_entries(
     );
     let mut stmt = conn.prepare(&sql)?;
     let rows = stmt
-        .query_map(params![client_id, from, to, include_non_billable], entries::map_entry)?
+        .query_map(
+            params![client_id, from, to, include_non_billable],
+            entries::map_entry,
+        )?
         .collect::<Result<Vec<_>, _>>()?;
     Ok(rows)
 }
@@ -732,7 +789,8 @@ mod tests {
         assert!(save_draft(&conn, &input(&client_id, vec![a.id.clone()])).is_err());
 
         // Rate changes do not alter invoiced entries.
-        conn.execute("UPDATE clients SET default_rate = 99999", []).unwrap();
+        conn.execute("UPDATE clients SET default_rate = 99999", [])
+            .unwrap();
         let mut edit = inp.clone();
         edit.id = Some(d.invoice.id.clone());
         edit.entry_ids = vec![a.id.clone()];
@@ -742,10 +800,16 @@ mod tests {
         assert_eq!(d2.lines[0].rate, 6_000);
         assert_eq!(d2.entries.len(), 1);
         // b was released by removing it from the draft.
-        assert!(crate::services::entries::get_entry(&conn, &b.id).unwrap().invoice_id.is_none());
+        assert!(crate::services::entries::get_entry(&conn, &b.id)
+            .unwrap()
+            .invoice_id
+            .is_none());
 
         set_status(&conn, &d.invoice.id, "sent").unwrap();
-        assert!(save_draft(&conn, &edit).is_err(), "sent invoices are read-only");
+        assert!(
+            save_draft(&conn, &edit).is_err(),
+            "sent invoices are read-only"
+        );
 
         // Second invoice gets the next number.
         let d3 = save_draft(&conn, &input(&client_id, vec![b.id.clone()])).unwrap();
@@ -756,7 +820,10 @@ mod tests {
         assert!(save_draft(&conn, &dup).is_err(), "numbers must be unique");
 
         delete(&conn, &d.invoice.id).unwrap();
-        assert!(crate::services::entries::get_entry(&conn, &a.id).unwrap().invoice_id.is_none());
+        assert!(crate::services::entries::get_entry(&conn, &a.id)
+            .unwrap()
+            .invoice_id
+            .is_none());
         let t = totals(&conn, None).unwrap();
         assert_eq!(t[0].draft, d3.invoice.total);
     }

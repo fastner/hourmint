@@ -62,7 +62,10 @@ pub fn summary(conn: &Connection, f: &EntryFilter) -> AppResult<Summary> {
         total_seconds: by_client.iter().map(|r| r.seconds).sum(),
         billable_seconds: by_client.iter().map(|r| r.billable_seconds).sum(),
         entry_count: by_client.iter().map(|r| r.entry_count).sum(),
-        amounts: amounts.into_iter().map(|(currency, amount)| CurrencyTotal { currency, amount }).collect(),
+        amounts: amounts
+            .into_iter()
+            .map(|(currency, amount)| CurrencyTotal { currency, amount })
+            .collect(),
         by_client,
         by_project,
     })
@@ -81,7 +84,12 @@ pub fn decimal(amount: i64, currency: &str) -> String {
     let div = 10_i64.pow(exp);
     let sign = if amount < 0 { "-" } else { "" };
     let a = amount.abs();
-    format!("{sign}{}.{:0width$}", a / div, a % div, width = exp as usize)
+    format!(
+        "{sign}{}.{:0width$}",
+        a / div,
+        a % div,
+        width = exp as usize
+    )
 }
 
 /// ISO 4217 minor-unit exponent for the few currencies that differ from 2.
@@ -95,32 +103,71 @@ pub fn currency_exponent(code: &str) -> u32 {
 }
 
 pub fn entries_csv(conn: &Connection, f: &EntryFilter) -> AppResult<Vec<u8>> {
-    let mut all = EntryFilter { limit: Some(1_000_000), offset: Some(0), ..f.clone() };
+    let mut all = EntryFilter {
+        limit: Some(1_000_000),
+        offset: Some(0),
+        ..f.clone()
+    };
     all.include_running = Some(false);
     let entries = list_entries(conn, &all)?;
     let mut w = csv::Writer::from_writer(Vec::new());
     w.write_record([
-        "date", "start_utc", "end_utc", "start_local", "end_local", "duration_seconds", "hours",
-        "client", "project", "description", "billable", "source", "rate", "amount", "currency",
+        "date",
+        "start_utc",
+        "end_utc",
+        "start_local",
+        "end_local",
+        "duration_seconds",
+        "hours",
+        "client",
+        "project",
+        "description",
+        "billable",
+        "source",
+        "rate",
+        "amount",
+        "currency",
         "invoice",
     ])?;
     for e in entries.iter().rev() {
         let start = crate::time::parse_iso(&e.started_at)?;
-        let end = e.ended_at.as_deref().map(crate::time::parse_iso).transpose()?;
+        let end = e
+            .ended_at
+            .as_deref()
+            .map(crate::time::parse_iso)
+            .transpose()?;
         let local_fmt = "%Y-%m-%d %H:%M:%S";
-        let amount = if e.billable { (e.duration_seconds as f64 * e.rate as f64 / 3600.0).round() as i64 } else { 0 };
+        let amount = if e.billable {
+            (e.duration_seconds as f64 * e.rate as f64 / 3600.0).round() as i64
+        } else {
+            0
+        };
         w.write_record([
-            crate::time::local_date(start).format("%Y-%m-%d").to_string(),
+            crate::time::local_date(start)
+                .format("%Y-%m-%d")
+                .to_string(),
             e.started_at.clone(),
             e.ended_at.clone().unwrap_or_default(),
-            start.with_timezone(&chrono::Local).format(local_fmt).to_string(),
-            end.map(|d| d.with_timezone(&chrono::Local).format(local_fmt).to_string()).unwrap_or_default(),
+            start
+                .with_timezone(&chrono::Local)
+                .format(local_fmt)
+                .to_string(),
+            end.map(|d| {
+                d.with_timezone(&chrono::Local)
+                    .format(local_fmt)
+                    .to_string()
+            })
+            .unwrap_or_default(),
             e.duration_seconds.to_string(),
             hours(e.duration_seconds),
             e.client_name.clone(),
             e.project_name.clone(),
             e.description.clone(),
-            if e.billable { "yes".into() } else { "no".into() },
+            if e.billable {
+                "yes".into()
+            } else {
+                "no".into()
+            },
             e.source.clone(),
             decimal(e.rate, &e.currency),
             decimal(amount, &e.currency),
@@ -128,7 +175,8 @@ pub fn entries_csv(conn: &Connection, f: &EntryFilter) -> AppResult<Vec<u8>> {
             e.invoice_number.clone().unwrap_or_default(),
         ])?;
     }
-    w.into_inner().map_err(|e| crate::error::AppError::Other(e.to_string()))
+    w.into_inner()
+        .map_err(|e| crate::error::AppError::Other(e.to_string()))
 }
 
 #[cfg(test)]
@@ -183,12 +231,16 @@ mod perf {
         }
         tx.commit().unwrap();
         let week = EntryFilter {
-            from: Some(crate::time::to_iso(chrono::Utc::now() - chrono::Duration::days(7))),
+            from: Some(crate::time::to_iso(
+                chrono::Utc::now() - chrono::Duration::days(7),
+            )),
             to: Some(crate::time::now_iso()),
             ..Default::default()
         };
         let t = std::time::Instant::now();
-        let n = crate::services::entries::list_entries(&conn, &week).unwrap().len();
+        let n = crate::services::entries::list_entries(&conn, &week)
+            .unwrap()
+            .len();
         println!("week list: {n} rows in {:?}", t.elapsed());
         let t = std::time::Instant::now();
         summary(&conn, &week).unwrap();

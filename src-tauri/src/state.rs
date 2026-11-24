@@ -52,12 +52,18 @@ pub struct AppState {
 
 impl AppState {
     pub fn with_db<T>(&self, f: impl FnOnce(&Connection) -> AppResult<T>) -> AppResult<T> {
-        let conn = self.db.lock().map_err(|_| AppError::Other("Database lock poisoned".into()))?;
+        let conn = self
+            .db
+            .lock()
+            .map_err(|_| AppError::Other("Database lock poisoned".into()))?;
         f(&conn)
     }
 
     pub fn with_db_mut<T>(&self, f: impl FnOnce(&mut Connection) -> AppResult<T>) -> AppResult<T> {
-        let mut conn = self.db.lock().map_err(|_| AppError::Other("Database lock poisoned".into()))?;
+        let mut conn = self
+            .db
+            .lock()
+            .map_err(|_| AppError::Other("Database lock poisoned".into()))?;
         f(&mut conn)
     }
 
