@@ -65,7 +65,11 @@ pub fn run() {
             log::info!(
                 "Hourmint {} ({}) starting; data at {}",
                 app.package_info().version,
-                if cfg!(feature = "direct") { "direct" } else { "app store" },
+                if cfg!(feature = "direct") {
+                    "direct"
+                } else {
+                    "app store"
+                },
                 paths.data_dir.display()
             );
             let mut settings = services::settings::get(&conn).map_err(|e| e.to_string())?;
@@ -79,7 +83,10 @@ pub fn run() {
             }
             let at_login = login_item::is_enabled();
             if at_login != settings.launch_at_login {
-                let patch = models::SettingsPatch { launch_at_login: Some(at_login), ..Default::default() };
+                let patch = models::SettingsPatch {
+                    launch_at_login: Some(at_login),
+                    ..Default::default()
+                };
                 settings = services::settings::update(&conn, &patch).map_err(|e| e.to_string())?;
             }
             let launched_at_login = login_item::launched_at_login();
@@ -92,7 +99,9 @@ pub fn run() {
                 popover_hidden_at: Mutex::new(None),
             });
             let handle = app.handle().clone();
-            app.state::<AppState>().refresh_running().map_err(|e| e.to_string())?;
+            app.state::<AppState>()
+                .refresh_running()
+                .map_err(|e| e.to_string())?;
 
             tray::create(&handle)?;
             windows::create_popover(&handle)?;

@@ -1,6 +1,9 @@
 //! Window helpers: main window, menu bar popover and idle prompt.
 
-use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, Rect, WebviewUrl, WebviewWindowBuilder, WindowEvent};
+use tauri::{
+    AppHandle, Emitter, Manager, PhysicalPosition, Rect, WebviewUrl, WebviewWindowBuilder,
+    WindowEvent,
+};
 
 use crate::state::AppState;
 
@@ -37,7 +40,8 @@ pub fn create_popover(app: &AppHandle) -> tauri::Result<()> {
         if let WindowEvent::Focused(false) = e {
             if let Some(w) = handle.get_webview_window("popover") {
                 let _ = w.hide();
-                *handle.state::<AppState>().popover_hidden_at.lock().unwrap() = Some(std::time::Instant::now());
+                *handle.state::<AppState>().popover_hidden_at.lock().unwrap() =
+                    Some(std::time::Instant::now());
             }
         }
     });
@@ -46,7 +50,9 @@ pub fn create_popover(app: &AppHandle) -> tauri::Result<()> {
 
 /// Toggle the popover just below the tray icon.
 pub fn toggle_popover(app: &AppHandle, anchor: Option<Rect>) {
-    let Some(w) = app.get_webview_window("popover") else { return };
+    let Some(w) = app.get_webview_window("popover") else {
+        return;
+    };
     if w.is_visible().unwrap_or(false) {
         let _ = w.hide();
         return;

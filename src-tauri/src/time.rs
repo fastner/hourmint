@@ -79,7 +79,10 @@ mod tests {
     fn iso_round_trip_matches_js_format() {
         let s = normalise_iso("2026-03-04T05:06:07+02:00").unwrap();
         assert_eq!(s, "2026-03-04T03:06:07.000Z");
-        assert_eq!(normalise_iso("2026-03-04T03:06:07.123Z").unwrap(), "2026-03-04T03:06:07.123Z");
+        assert_eq!(
+            normalise_iso("2026-03-04T03:06:07.123Z").unwrap(),
+            "2026-03-04T03:06:07.123Z"
+        );
     }
 
     #[test]

@@ -7,11 +7,20 @@ use serde_json::{Map, Value};
 
 use crate::error::AppResult;
 
-pub const TABLES: &[&str] = &["settings", "clients", "projects", "time_entries", "invoices", "invoice_lines"];
+pub const TABLES: &[&str] = &[
+    "settings",
+    "clients",
+    "projects",
+    "time_entries",
+    "invoices",
+    "invoice_lines",
+];
 
 fn table_rows(conn: &Connection, table: &str) -> AppResult<(Vec<String>, Vec<Vec<Value>>)> {
     // Table names come from the fixed list above, never from user input.
-    let mut stmt = conn.prepare(&format!("SELECT * FROM {table} WHERE deleted_at IS NULL ORDER BY created_at"))?;
+    let mut stmt = conn.prepare(&format!(
+        "SELECT * FROM {table} WHERE deleted_at IS NULL ORDER BY created_at"
+    ))?;
     let cols: Vec<String> = stmt.column_names().iter().map(|s| s.to_string()).collect();
     let n = cols.len();
     let rows = stmt
@@ -35,7 +44,10 @@ fn table_rows(conn: &Connection, table: &str) -> AppResult<(Vec<String>, Vec<Vec
 pub fn export_json(conn: &Connection) -> AppResult<Vec<u8>> {
     let mut root = Map::new();
     root.insert("app".into(), Value::from("Hourmint"));
-    root.insert("schemaVersion".into(), Value::from(crate::db::schema_version()));
+    root.insert(
+        "schemaVersion".into(),
+        Value::from(crate::db::schema_version()),
+    );
     root.insert("exportedAt".into(), Value::from(crate::time::now_iso()));
     for t in TABLES {
         let (cols, rows) = table_rows(conn, t)?;
@@ -82,6 +94,9 @@ mod tests {
         assert_eq!(json["time_entries"].as_array().unwrap().len(), 1);
         assert_eq!(json["clients"][0]["name"], "Acme");
         let dir = tempfile::tempdir().unwrap();
-        assert_eq!(export_csv_dir(&conn, dir.path()).unwrap().len(), TABLES.len());
+        assert_eq!(
+            export_csv_dir(&conn, dir.path()).unwrap().len(),
+            TABLES.len()
+        );
     }
 }

@@ -14,7 +14,11 @@ mod imp {
     pub fn set(enabled: bool) -> Result<(), String> {
         unsafe {
             let service = SMAppService::mainAppService();
-            let result = if enabled { service.registerAndReturnError() } else { service.unregisterAndReturnError() };
+            let result = if enabled {
+                service.registerAndReturnError()
+            } else {
+                service.unregisterAndReturnError()
+            };
             result.map_err(|e| e.localizedDescription().to_string())
         }
     }
@@ -29,7 +33,9 @@ mod imp {
     /// event is being handled (during app setup).
     pub fn launched_at_login() -> bool {
         let manager = NSAppleEventManager::sharedAppleEventManager();
-        let Some(event) = manager.currentAppleEvent() else { return false };
+        let Some(event) = manager.currentAppleEvent() else {
+            return false;
+        };
         // keyAEPropData → keyAELaunchedAsLogInItem (same check as Apple's login item samples).
         let prop: Option<Retained<NSAppleEventDescriptor>> =
             unsafe { msg_send![&*event, paramDescriptorForKeyword: four_cc(b"prdt")] };
@@ -56,7 +62,9 @@ pub use imp::{is_enabled, launched_at_login, set};
 /// Builds before 0.1.1 used a LaunchAgent plist; remove it so the app isn't started twice.
 #[cfg(all(target_os = "macos", feature = "direct"))]
 pub fn remove_legacy_launch_agent() -> bool {
-    let Some(home) = std::env::var_os("HOME") else { return false };
+    let Some(home) = std::env::var_os("HOME") else {
+        return false;
+    };
     let plist = std::path::Path::new(&home).join("Library/LaunchAgents/Hourmint.plist");
     plist.exists() && std::fs::remove_file(plist).is_ok()
 }

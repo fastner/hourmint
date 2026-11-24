@@ -251,7 +251,10 @@ pub fn backup_to(conn: &Connection, dest: &Path) -> AppResult<()> {
 /// Create today's automatic backup if it does not exist yet, keeping the last 7.
 pub fn daily_backup(conn: &Connection, backup_dir: &Path) -> AppResult<Option<PathBuf>> {
     std::fs::create_dir_all(backup_dir)?;
-    let name = format!("{DAILY_PREFIX}{}.sqlite", chrono::Local::now().format("%Y-%m-%d"));
+    let name = format!(
+        "{DAILY_PREFIX}{}.sqlite",
+        chrono::Local::now().format("%Y-%m-%d")
+    );
     let dest = backup_dir.join(name);
     if dest.exists() {
         return Ok(None);
@@ -320,7 +323,9 @@ pub fn validate_backup_file(path: &Path) -> AppResult<()> {
     let version = user_version(&src)
         .map_err(|_| AppError::Validation("The file is not a SQLite database.".into()))?;
     if version < 1 {
-        return Err(AppError::Validation("The file is not a Hourmint backup.".into()));
+        return Err(AppError::Validation(
+            "The file is not a Hourmint backup.".into(),
+        ));
     }
     if version > schema_version() {
         return Err(AppError::Validation(
@@ -333,7 +338,9 @@ pub fn validate_backup_file(path: &Path) -> AppResult<()> {
         |r| r.get(0),
     )?;
     if has_tables != 6 {
-        return Err(AppError::Validation("The file is not a Hourmint backup.".into()));
+        return Err(AppError::Validation(
+            "The file is not a Hourmint backup.".into(),
+        ));
     }
     Ok(())
 }
@@ -360,7 +367,9 @@ mod tests {
     #[test]
     fn global_shortcut_is_off_by_default_and_cleared_on_upgrade() {
         let conn = open_in_memory().unwrap();
-        let sc: String = conn.query_row("SELECT global_shortcut FROM settings", [], |r| r.get(0)).unwrap();
+        let sc: String = conn
+            .query_row("SELECT global_shortcut FROM settings", [], |r| r.get(0))
+            .unwrap();
         assert_eq!(sc, "");
         // A v1 database with the old default gets it cleared by migration 2.
         let old = Connection::open_in_memory().unwrap();
@@ -372,7 +381,9 @@ mod tests {
         )
         .unwrap();
         migrate(&old).unwrap();
-        let sc: String = old.query_row("SELECT global_shortcut FROM settings", [], |r| r.get(0)).unwrap();
+        let sc: String = old
+            .query_row("SELECT global_shortcut FROM settings", [], |r| r.get(0))
+            .unwrap();
         assert_eq!(sc, "");
     }
 
@@ -393,7 +404,10 @@ mod tests {
         .unwrap();
         let ins = "INSERT INTO time_entries (id, project_id, started_at, source, created_at, updated_at) VALUES (?1,'p',?2,'timer',?2,?2)";
         conn.execute(ins, ["e1", &now]).unwrap();
-        assert!(conn.execute(ins, ["e2", &now]).is_err(), "second running timer must be rejected");
+        assert!(
+            conn.execute(ins, ["e2", &now]).is_err(),
+            "second running timer must be rejected"
+        );
     }
 
     #[test]
@@ -402,15 +416,22 @@ mod tests {
         let db_path = dir.path().join(DB_FILE);
         let backups = dir.path().join("backups");
         let mut conn = open(&db_path, &backups).unwrap();
-        conn.execute("UPDATE settings SET business_name = 'Before'", []).unwrap();
+        conn.execute("UPDATE settings SET business_name = 'Before'", [])
+            .unwrap();
         let copy = dir.path().join("copy.sqlite");
         backup_to(&conn, &copy).unwrap();
-        conn.execute("UPDATE settings SET business_name = 'After'", []).unwrap();
+        conn.execute("UPDATE settings SET business_name = 'After'", [])
+            .unwrap();
         restore_from(&mut conn, &copy).unwrap();
-        let name: String = conn.query_row("SELECT business_name FROM settings", [], |r| r.get(0)).unwrap();
+        let name: String = conn
+            .query_row("SELECT business_name FROM settings", [], |r| r.get(0))
+            .unwrap();
         assert_eq!(name, "Before");
         assert!(daily_backup(&conn, &backups).unwrap().is_some());
-        assert!(daily_backup(&conn, &backups).unwrap().is_none(), "only one per day");
+        assert!(
+            daily_backup(&conn, &backups).unwrap().is_none(),
+            "only one per day"
+        );
     }
 
     #[test]
@@ -418,7 +439,8 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let p = dir.path().join("other.sqlite");
         let c = Connection::open(&p).unwrap();
-        c.execute_batch("CREATE TABLE x (a); PRAGMA user_version = 1;").unwrap();
+        c.execute_batch("CREATE TABLE x (a); PRAGMA user_version = 1;")
+            .unwrap();
         drop(c);
         assert!(validate_backup_file(&p).is_err());
         let junk = dir.path().join("junk.sqlite");
