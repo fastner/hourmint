@@ -50,10 +50,16 @@ fn map_client(r: &Row) -> rusqlite::Result<Client> {
 pub fn list_clients(conn: &Connection, include_archived: bool) -> AppResult<Vec<Client>> {
     let sql = format!(
         "{CLIENT_SELECT} {} ORDER BY c.archived_at IS NOT NULL, c.name COLLATE NOCASE",
-        if include_archived { "" } else { "AND c.archived_at IS NULL" }
+        if include_archived {
+            ""
+        } else {
+            "AND c.archived_at IS NULL"
+        }
     );
     let mut stmt = conn.prepare(&sql)?;
-    let rows = stmt.query_map([], map_client)?.collect::<Result<Vec<_>, _>>()?;
+    let rows = stmt
+        .query_map([], map_client)?
+        .collect::<Result<Vec<_>, _>>()?;
     Ok(rows)
 }
 
@@ -215,11 +221,17 @@ pub fn list_projects(
     if client_id.is_some() {
         sql.push_str(" AND p.client_id = ?1");
     }
-    sql.push_str(" ORDER BY c.name COLLATE NOCASE, p.archived_at IS NOT NULL, p.name COLLATE NOCASE");
+    sql.push_str(
+        " ORDER BY c.name COLLATE NOCASE, p.archived_at IS NOT NULL, p.name COLLATE NOCASE",
+    );
     let mut stmt = conn.prepare(&sql)?;
     let rows = match client_id {
-        Some(cid) => stmt.query_map([cid], map_project)?.collect::<Result<Vec<_>, _>>()?,
-        None => stmt.query_map([], map_project)?.collect::<Result<Vec<_>, _>>()?,
+        Some(cid) => stmt
+            .query_map([cid], map_project)?
+            .collect::<Result<Vec<_>, _>>()?,
+        None => stmt
+            .query_map([], map_project)?
+            .collect::<Result<Vec<_>, _>>()?,
     };
     Ok(rows)
 }
@@ -249,7 +261,14 @@ pub fn create_project(conn: &Connection, input: &ProjectInput) -> AppResult<Proj
     conn.execute(
         "INSERT INTO projects (id, client_id, name, rate_override, color, created_at, updated_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6)",
-        params![id, input.client_id, input.name.trim(), input.rate_override, input.color, now],
+        params![
+            id,
+            input.client_id,
+            input.name.trim(),
+            input.rate_override,
+            input.color,
+            now
+        ],
     )?;
     get_project(conn, &id)
 }
@@ -325,7 +344,12 @@ mod tests {
         let c = create_client(&conn, &client_input("Acme")).unwrap();
         let p = create_project(
             &conn,
-            &ProjectInput { client_id: c.id.clone(), name: "Site".into(), rate_override: Some(12_000), color: None },
+            &ProjectInput {
+                client_id: c.id.clone(),
+                name: "Site".into(),
+                rate_override: Some(12_000),
+                color: None,
+            },
         )
         .unwrap();
         assert_eq!(p.effective_rate, 12_000);

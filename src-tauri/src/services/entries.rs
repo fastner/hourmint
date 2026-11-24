@@ -90,7 +90,11 @@ pub fn stop_timer(conn: &Connection, at: DateTime<Utc>) -> AppResult<Option<Entr
 }
 
 /// Start a new timer at `at`, stopping and saving any running one first.
-pub fn start_timer(conn: &Connection, input: &StartTimerInput, at: DateTime<Utc>) -> AppResult<Entry> {
+pub fn start_timer(
+    conn: &Connection,
+    input: &StartTimerInput,
+    at: DateTime<Utc>,
+) -> AppResult<Entry> {
     restart_timer(conn, input, at, at)
 }
 
@@ -144,7 +148,11 @@ pub fn continue_entry(conn: &Connection, id: &str, at: DateTime<Utc>) -> AppResu
     let e = get_entry(conn, id)?;
     start_timer(
         conn,
-        &StartTimerInput { project_id: e.project_id, description: e.description, billable: e.billable },
+        &StartTimerInput {
+            project_id: e.project_id,
+            description: e.description,
+            billable: e.billable,
+        },
         at,
     )
 }
@@ -189,7 +197,12 @@ struct ValidRange {
 }
 
 /// End after start, not in the future, no overlap with the running timer.
-fn validate_range(conn: &Connection, started_at: &str, ended_at: &str, now: DateTime<Utc>) -> AppResult<ValidRange> {
+fn validate_range(
+    conn: &Connection,
+    started_at: &str,
+    ended_at: &str,
+    now: DateTime<Utc>,
+) -> AppResult<ValidRange> {
     let start = parse_iso(started_at)?;
     let end = parse_iso(ended_at)?;
     if end <= start {
@@ -204,14 +217,24 @@ fn validate_range(conn: &Connection, started_at: &str, ended_at: &str, now: Date
     if let Some(running) = get_running(conn)? {
         let rs = parse_iso(&running.started_at)?;
         if end > rs {
-            return validation("This entry overlaps the running timer. Stop the timer or pick another time.");
+            return validation(
+                "This entry overlaps the running timer. Stop the timer or pick another time.",
+            );
         }
     }
-    Ok(ValidRange { start: to_iso(start), end: to_iso(end), seconds: seconds_between(start, end) })
+    Ok(ValidRange {
+        start: to_iso(start),
+        end: to_iso(end),
+        seconds: seconds_between(start, end),
+    })
 }
 
 /// Add a manual entry.
-pub fn create_entry(conn: &Connection, input: &EntryInput, now: DateTime<Utc>) -> AppResult<SaveEntryResult> {
+pub fn create_entry(
+    conn: &Connection,
+    input: &EntryInput,
+    now: DateTime<Utc>,
+) -> AppResult<SaveEntryResult> {
     ensure_active_project(conn, &input.project_id)?;
     let r = validate_range(conn, &input.started_at, &input.ended_at, now)?;
     let id = time::new_id();
@@ -222,11 +245,19 @@ pub fn create_entry(conn: &Connection, input: &EntryInput, now: DateTime<Utc>) -
         params![id, input.project_id, input.description.trim(), r.start, r.end, r.seconds, input.billable, ts],
     )?;
     let overlaps = find_overlaps(conn, &r.start, &r.end, Some(&id))?;
-    Ok(SaveEntryResult { entry: get_entry(conn, &id)?, overlaps })
+    Ok(SaveEntryResult {
+        entry: get_entry(conn, &id)?,
+        overlaps,
+    })
 }
 
 /// Edit a finished, unbilled entry. Changing a timer entry's times marks it `timer_edited`.
-pub fn update_entry(conn: &Connection, id: &str, input: &EntryInput, now: DateTime<Utc>) -> AppResult<SaveEntryResult> {
+pub fn update_entry(
+    conn: &Connection,
+    id: &str,
+    input: &EntryInput,
+    now: DateTime<Utc>,
+) -> AppResult<SaveEntryResult> {
     let existing = get_entry(conn, id)?;
     ensure_unlocked(&existing)?;
     if existing.ended_at.is_none() {
@@ -236,16 +267,34 @@ pub fn update_entry(conn: &Connection, id: &str, input: &EntryInput, now: DateTi
         ensure_active_project(conn, &input.project_id)?;
     }
     let r = validate_range(conn, &input.started_at, &input.ended_at, now)?;
-    let times_changed = r.start != existing.started_at || Some(&r.end) != existing.ended_at.as_ref();
-    let source = if existing.source == "timer" && times_changed { "timer_edited" } else { existing.source.as_str() };
+    let times_changed =
+        r.start != existing.started_at || Some(&r.end) != existing.ended_at.as_ref();
+    let source = if existing.source == "timer" && times_changed {
+        "timer_edited"
+    } else {
+        existing.source.as_str()
+    };
     conn.execute(
         "UPDATE time_entries SET project_id = ?2, description = ?3, started_at = ?4, ended_at = ?5,
                 duration_seconds = ?6, billable = ?7, source = ?8, updated_at = ?9
          WHERE id = ?1",
-        params![id, input.project_id, input.description.trim(), r.start, r.end, r.seconds, input.billable, source, time::now_iso()],
+        params![
+            id,
+            input.project_id,
+            input.description.trim(),
+            r.start,
+            r.end,
+            r.seconds,
+            input.billable,
+            source,
+            time::now_iso()
+        ],
     )?;
     let overlaps = find_overlaps(conn, &r.start, &r.end, Some(id))?;
-    Ok(SaveEntryResult { entry: get_entry(conn, id)?, overlaps })
+    Ok(SaveEntryResult {
+        entry: get_entry(conn, id)?,
+        overlaps,
+    })
 }
 
 /// Toggle billable on an unbilled entry without touching its times.
@@ -283,7 +332,11 @@ pub fn split_entry(conn: &Connection, id: &str, at: &str) -> AppResult<(Entry, E
     if split <= start || split >= end {
         return validation("The split time must be between the entry's start and end.");
     }
-    let source = if e.source == "timer" { "timer_edited" } else { e.source.as_str() };
+    let source = if e.source == "timer" {
+        "timer_edited"
+    } else {
+        e.source.as_str()
+    };
     let tx = conn.unchecked_transaction()?;
     let now = time::now_iso();
     tx.execute(
@@ -324,8 +377,18 @@ pub fn filter_sql(f: &EntryFilter) -> (String, Vec<Box<dyn ToSql>>) {
         push(" AND e.billable = ?", Box::new(b), &mut sql);
     }
     if let Some(s) = f.search.as_ref().filter(|s| !s.trim().is_empty()) {
-        let like = format!("%{}%", s.trim().replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_"));
-        push(" AND e.description LIKE ? ESCAPE '\\'", Box::new(like), &mut sql);
+        let like = format!(
+            "%{}%",
+            s.trim()
+                .replace('\\', "\\\\")
+                .replace('%', "\\%")
+                .replace('_', "\\_")
+        );
+        push(
+            " AND e.description LIKE ? ESCAPE '\\'",
+            Box::new(like),
+            &mut sql,
+        );
     }
     match f.billed {
         Some(true) => sql.push_str(" AND e.invoice_id IS NOT NULL"),
@@ -342,10 +405,14 @@ pub fn list_entries(conn: &Connection, f: &EntryFilter) -> AppResult<Vec<Entry>>
     let (where_sql, vals) = filter_sql(f);
     let limit = f.limit.unwrap_or(500).clamp(1, 1_000_000);
     let offset = f.offset.unwrap_or(0).max(0);
-    let sql = format!("{ENTRY_SELECT}{where_sql} ORDER BY e.started_at DESC LIMIT {limit} OFFSET {offset}");
+    let sql = format!(
+        "{ENTRY_SELECT}{where_sql} ORDER BY e.started_at DESC LIMIT {limit} OFFSET {offset}"
+    );
     let mut stmt = conn.prepare(&sql)?;
     let params: Vec<&dyn ToSql> = vals.iter().map(|b| b.as_ref()).collect();
-    let rows = stmt.query_map(params.as_slice(), map_entry)?.collect::<Result<Vec<_>, _>>()?;
+    let rows = stmt
+        .query_map(params.as_slice(), map_entry)?
+        .collect::<Result<Vec<_>, _>>()?;
     Ok(rows)
 }
 
@@ -405,7 +472,12 @@ pub mod tests {
         .unwrap();
         let p = clients::create_project(
             &conn,
-            &ProjectInput { client_id: c.id, name: "Web".into(), rate_override: None, color: None },
+            &ProjectInput {
+                client_id: c.id,
+                name: "Web".into(),
+                rate_override: None,
+                color: None,
+            },
         )
         .unwrap();
         (conn, p.id)
@@ -434,14 +506,20 @@ pub mod tests {
     #[test]
     fn starting_a_timer_stops_the_running_one() {
         let (conn, pid) = setup();
-        let input = StartTimerInput { project_id: pid.clone(), description: "a".into(), billable: true };
+        let input = StartTimerInput {
+            project_id: pid.clone(),
+            description: "a".into(),
+            billable: true,
+        };
         let first = start_timer(&conn, &input, ts("2026-01-01T09:00:00Z")).unwrap();
         let second = start_timer(&conn, &input, ts("2026-01-01T10:30:00Z")).unwrap();
         let first = get_entry(&conn, &first.id).unwrap();
         assert_eq!(first.ended_at.as_deref(), Some("2026-01-01T10:30:00.000Z"));
         assert_eq!(first.duration_seconds, 5400);
         assert_eq!(get_running(&conn).unwrap().unwrap().id, second.id);
-        let stopped = stop_timer(&conn, ts("2026-01-01T10:45:00Z")).unwrap().unwrap();
+        let stopped = stop_timer(&conn, ts("2026-01-01T10:45:00Z"))
+            .unwrap()
+            .unwrap();
         assert_eq!(stopped.duration_seconds, 900);
         assert!(get_running(&conn).unwrap().is_none());
     }
@@ -449,7 +527,11 @@ pub mod tests {
     #[test]
     fn editing_timer_times_marks_timer_edited() {
         let (conn, pid) = setup();
-        let input = StartTimerInput { project_id: pid.clone(), description: "a".into(), billable: true };
+        let input = StartTimerInput {
+            project_id: pid.clone(),
+            description: "a".into(),
+            billable: true,
+        };
         let e = start_timer(&conn, &input, ts("2026-01-01T09:00:00Z")).unwrap();
         stop_timer(&conn, ts("2026-01-01T10:00:00Z")).unwrap();
         let mut ei = EntryInput {
@@ -460,7 +542,10 @@ pub mod tests {
             billable: true,
         };
         let r = update_entry(&conn, &e.id, &ei, ts("2030-01-01T00:00:00Z")).unwrap();
-        assert_eq!(r.entry.source, "timer", "description-only edit keeps source");
+        assert_eq!(
+            r.entry.source, "timer",
+            "description-only edit keeps source"
+        );
         ei.ended_at = "2026-01-01T10:15:00Z".into();
         let r = update_entry(&conn, &e.id, &ei, ts("2030-01-01T00:00:00Z")).unwrap();
         assert_eq!(r.entry.source, "timer_edited");
@@ -482,15 +567,32 @@ pub mod tests {
         manual(&conn, &pid, "2026-01-01T09:00:00Z", "2026-01-01T10:00:00Z");
         let r = create_entry(
             &conn,
-            &EntryInput { started_at: "2026-01-01T09:30:00Z".into(), ended_at: "2026-01-01T11:00:00Z".into(), ..bad.clone() },
+            &EntryInput {
+                started_at: "2026-01-01T09:30:00Z".into(),
+                ended_at: "2026-01-01T11:00:00Z".into(),
+                ..bad.clone()
+            },
             now,
         )
         .unwrap();
         assert_eq!(r.overlaps.len(), 1, "overlap warns but saves");
         assert_eq!(r.entry.source, "manual");
         // Overlapping the running timer is blocked.
-        start_timer(&conn, &StartTimerInput { project_id: pid.clone(), description: String::new(), billable: true }, ts("2026-01-02T09:00:00Z")).unwrap();
-        let clash = EntryInput { started_at: "2026-01-02T08:00:00Z".into(), ended_at: "2026-01-02T09:30:00Z".into(), ..bad };
+        start_timer(
+            &conn,
+            &StartTimerInput {
+                project_id: pid.clone(),
+                description: String::new(),
+                billable: true,
+            },
+            ts("2026-01-02T09:00:00Z"),
+        )
+        .unwrap();
+        let clash = EntryInput {
+            started_at: "2026-01-02T08:00:00Z".into(),
+            ended_at: "2026-01-02T09:30:00Z".into(),
+            ..bad
+        };
         assert!(create_entry(&conn, &clash, now).is_err());
     }
 
@@ -506,11 +608,21 @@ pub mod tests {
         assert_eq!(all.len(), 2);
         let ranged = list_entries(
             &conn,
-            &EntryFilter { from: Some("2026-01-01T09:30:00.000Z".into()), ..Default::default() },
+            &EntryFilter {
+                from: Some("2026-01-01T09:30:00.000Z".into()),
+                ..Default::default()
+            },
         )
         .unwrap();
         assert_eq!(ranged.len(), 1);
-        let searched = list_entries(&conn, &EntryFilter { search: Some("wor".into()), ..Default::default() }).unwrap();
+        let searched = list_entries(
+            &conn,
+            &EntryFilter {
+                search: Some("wor".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
         assert_eq!(searched.len(), 2);
     }
 }

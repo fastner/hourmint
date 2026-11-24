@@ -61,10 +61,14 @@ pub async fn pick_logo(app: AppHandle, state: S<'_>) -> AppResult<Option<Setting
     else {
         return Ok(None);
     };
-    let src = file.into_path().map_err(|e| AppError::Other(e.to_string()))?;
+    let src = file
+        .into_path()
+        .map_err(|e| AppError::Other(e.to_string()))?;
     let meta = std::fs::metadata(&src)?;
     if meta.len() > 5 * 1024 * 1024 {
-        return Err(AppError::Validation("The logo must be smaller than 5 MB.".into()));
+        return Err(AppError::Validation(
+            "The logo must be smaller than 5 MB.".into(),
+        ));
     }
     let ext = src
         .extension()
@@ -73,7 +77,10 @@ pub async fn pick_logo(app: AppHandle, state: S<'_>) -> AppResult<Option<Setting
         .unwrap_or_else(|| "png".into());
     std::fs::create_dir_all(&state.paths.logo_dir)?;
     // Never overwrite: old invoices keep pointing at the logo they were created with.
-    let dest = state.paths.logo_dir.join(format!("{}.{ext}", time::new_id()));
+    let dest = state
+        .paths
+        .logo_dir
+        .join(format!("{}.{ext}", time::new_id()));
     std::fs::copy(&src, &dest)?;
     let s = state.with_db(|c| settings::set_logo_path(c, Some(&dest.to_string_lossy())))?;
     notify_changed(&app);
@@ -94,16 +101,30 @@ pub fn read_logo(state: S, path: String) -> AppResult<Option<String>> {
     let Ok(canon) = p.canonicalize() else {
         return Ok(None);
     };
-    let logo_dir = state.paths.logo_dir.canonicalize().unwrap_or(state.paths.logo_dir.clone());
+    let logo_dir = state
+        .paths
+        .logo_dir
+        .canonicalize()
+        .unwrap_or(state.paths.logo_dir.clone());
     if !canon.starts_with(&logo_dir) {
-        return Err(AppError::Validation("Logo path is outside the app folder.".into()));
+        return Err(AppError::Validation(
+            "Logo path is outside the app folder.".into(),
+        ));
     }
     let bytes = std::fs::read(&canon)?;
-    let mime = match canon.extension().and_then(|e| e.to_str()).map(|e| e.to_ascii_lowercase()).as_deref() {
+    let mime = match canon
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_ascii_lowercase())
+        .as_deref()
+    {
         Some("jpg") | Some("jpeg") => "image/jpeg",
         _ => "image/png",
     };
-    Ok(Some(format!("data:{mime};base64,{}", base64::engine::general_purpose::STANDARD.encode(bytes))))
+    Ok(Some(format!(
+        "data:{mime};base64,{}",
+        base64::engine::general_purpose::STANDARD.encode(bytes)
+    )))
 }
 
 // ------------------------------------------------------------------ clients & projects
@@ -126,14 +147,24 @@ pub fn create_client(app: AppHandle, state: S, input: ClientInput) -> AppResult<
 }
 
 #[tauri::command]
-pub fn update_client(app: AppHandle, state: S, id: String, input: ClientInput) -> AppResult<Client> {
+pub fn update_client(
+    app: AppHandle,
+    state: S,
+    id: String,
+    input: ClientInput,
+) -> AppResult<Client> {
     let r = state.with_db(|c| clients::update_client(c, &id, &input))?;
     notify_changed(&app);
     Ok(r)
 }
 
 #[tauri::command]
-pub fn set_client_archived(app: AppHandle, state: S, id: String, archived: bool) -> AppResult<Client> {
+pub fn set_client_archived(
+    app: AppHandle,
+    state: S,
+    id: String,
+    archived: bool,
+) -> AppResult<Client> {
     let r = state.with_db(|c| clients::set_client_archived(c, &id, archived))?;
     notify_changed(&app);
     Ok(r)
@@ -147,7 +178,11 @@ pub fn delete_client(app: AppHandle, state: S, id: String) -> AppResult<()> {
 }
 
 #[tauri::command]
-pub fn list_projects(state: S, client_id: Option<String>, include_archived: bool) -> AppResult<Vec<Project>> {
+pub fn list_projects(
+    state: S,
+    client_id: Option<String>,
+    include_archived: bool,
+) -> AppResult<Vec<Project>> {
     state.with_db(|c| clients::list_projects(c, client_id.as_deref(), include_archived))
 }
 
@@ -159,14 +194,24 @@ pub fn create_project(app: AppHandle, state: S, input: ProjectInput) -> AppResul
 }
 
 #[tauri::command]
-pub fn update_project(app: AppHandle, state: S, id: String, input: ProjectInput) -> AppResult<Project> {
+pub fn update_project(
+    app: AppHandle,
+    state: S,
+    id: String,
+    input: ProjectInput,
+) -> AppResult<Project> {
     let r = state.with_db(|c| clients::update_project(c, &id, &input))?;
     notify_changed(&app);
     Ok(r)
 }
 
 #[tauri::command]
-pub fn set_project_archived(app: AppHandle, state: S, id: String, archived: bool) -> AppResult<Project> {
+pub fn set_project_archived(
+    app: AppHandle,
+    state: S,
+    id: String,
+    archived: bool,
+) -> AppResult<Project> {
     let r = state.with_db(|c| clients::set_project_archived(c, &id, archived))?;
     notify_changed(&app);
     Ok(r)
@@ -222,14 +267,24 @@ pub fn create_entry(app: AppHandle, state: S, input: EntryInput) -> AppResult<Sa
 }
 
 #[tauri::command]
-pub fn update_entry(app: AppHandle, state: S, id: String, input: EntryInput) -> AppResult<SaveEntryResult> {
+pub fn update_entry(
+    app: AppHandle,
+    state: S,
+    id: String,
+    input: EntryInput,
+) -> AppResult<SaveEntryResult> {
     let r = state.with_db(|c| entries::update_entry(c, &id, &input, time::now()))?;
     notify_changed(&app);
     Ok(r)
 }
 
 #[tauri::command]
-pub fn set_entry_billable(app: AppHandle, state: S, id: String, billable: bool) -> AppResult<Entry> {
+pub fn set_entry_billable(
+    app: AppHandle,
+    state: S,
+    id: String,
+    billable: bool,
+) -> AppResult<Entry> {
     let r = state.with_db(|c| entries::set_billable(c, &id, billable))?;
     notify_changed(&app);
     Ok(r)
@@ -250,7 +305,12 @@ pub fn split_entry(app: AppHandle, state: S, id: String, at: String) -> AppResul
 }
 
 #[tauri::command]
-pub fn find_overlaps(state: S, started_at: String, ended_at: String, exclude_id: Option<String>) -> AppResult<Vec<Entry>> {
+pub fn find_overlaps(
+    state: S,
+    started_at: String,
+    ended_at: String,
+    exclude_id: Option<String>,
+) -> AppResult<Vec<Entry>> {
     let start = time::normalise_iso(&started_at)?;
     let end = time::normalise_iso(&ended_at)?;
     state.with_db(|c| entries::find_overlaps(c, &start, &end, exclude_id.as_deref()))
@@ -291,7 +351,10 @@ pub fn get_idle_state(state: S) -> AppResult<Option<IdleInfo>> {
         Some(id) => state.with_db(|c| entries::get_entry(c, &id)).ok(),
         None => None,
     };
-    Ok(Some(IdleInfo { idle_since: time::to_iso(since), entry }))
+    Ok(Some(IdleInfo {
+        idle_since: time::to_iso(since),
+        entry,
+    }))
 }
 
 #[tauri::command]
@@ -329,7 +392,15 @@ pub fn invoice_candidates(
     to: Option<String>,
     invoice_id: Option<String>,
 ) -> AppResult<Vec<Entry>> {
-    state.with_db(|c| invoices::candidate_entries(c, &client_id, from.as_deref(), to.as_deref(), invoice_id.as_deref()))
+    state.with_db(|c| {
+        invoices::candidate_entries(
+            c,
+            &client_id,
+            from.as_deref(),
+            to.as_deref(),
+            invoice_id.as_deref(),
+        )
+    })
 }
 
 #[tauri::command]
@@ -351,7 +422,12 @@ pub fn save_invoice(app: AppHandle, state: S, input: InvoiceInput) -> AppResult<
 }
 
 #[tauri::command]
-pub fn set_invoice_status(app: AppHandle, state: S, id: String, status: String) -> AppResult<Invoice> {
+pub fn set_invoice_status(
+    app: AppHandle,
+    state: S,
+    id: String,
+    status: String,
+) -> AppResult<Invoice> {
     let r = state.with_db(|c| invoices::set_status(c, &id, &status))?;
     notify_changed(&app);
     Ok(r)
@@ -372,12 +448,25 @@ pub fn timesheet_entries(
     to: Option<String>,
     include_non_billable: bool,
 ) -> AppResult<Vec<Entry>> {
-    state.with_db(|c| invoices::timesheet_entries(c, &client_id, from.as_deref(), to.as_deref(), include_non_billable))
+    state.with_db(|c| {
+        invoices::timesheet_entries(
+            c,
+            &client_id,
+            from.as_deref(),
+            to.as_deref(),
+            include_non_billable,
+        )
+    })
 }
 
 // ------------------------------------------------------------------ files & data
 
-fn save_dialog(app: &AppHandle, default_name: &str, filter_name: &str, ext: &str) -> AppResult<Option<PathBuf>> {
+fn save_dialog(
+    app: &AppHandle,
+    default_name: &str,
+    filter_name: &str,
+    ext: &str,
+) -> AppResult<Option<PathBuf>> {
     let picked = app
         .dialog()
         .file()
@@ -385,7 +474,9 @@ fn save_dialog(app: &AppHandle, default_name: &str, filter_name: &str, ext: &str
         .add_filter(filter_name, &[ext])
         .blocking_save_file();
     match picked {
-        Some(fp) => Ok(Some(fp.into_path().map_err(|e| AppError::Other(e.to_string()))?)),
+        Some(fp) => Ok(Some(
+            fp.into_path().map_err(|e| AppError::Other(e.to_string()))?,
+        )),
         None => Ok(None),
     }
 }
@@ -410,7 +501,12 @@ pub async fn save_file(
 }
 
 #[tauri::command]
-pub async fn export_entries_csv(app: AppHandle, state: S<'_>, filter: EntryFilter, default_name: String) -> AppResult<Option<String>> {
+pub async fn export_entries_csv(
+    app: AppHandle,
+    state: S<'_>,
+    filter: EntryFilter,
+    default_name: String,
+) -> AppResult<Option<String>> {
     let bytes = state.with_db(|c| reports::entries_csv(c, &filter))?;
     let Some(path) = save_dialog(&app, &default_name, "CSV", "csv")? else {
         return Ok(None);
@@ -425,17 +521,30 @@ pub async fn export_all(app: AppHandle, state: S<'_>, format: String) -> AppResu
     match format.as_str() {
         "json" => {
             let bytes = state.with_db(export::export_json)?;
-            let Some(path) = save_dialog(&app, &format!("hourmint-export-{stamp}.json"), "JSON", "json")? else {
+            let Some(path) = save_dialog(
+                &app,
+                &format!("hourmint-export-{stamp}.json"),
+                "JSON",
+                "json",
+            )?
+            else {
                 return Ok(None);
             };
             std::fs::write(&path, bytes)?;
             Ok(Some(path.to_string_lossy().into_owned()))
         }
         "csv" => {
-            let Some(dir) = app.dialog().file().set_title("Choose a folder for the CSV files").blocking_pick_folder() else {
+            let Some(dir) = app
+                .dialog()
+                .file()
+                .set_title("Choose a folder for the CSV files")
+                .blocking_pick_folder()
+            else {
                 return Ok(None);
             };
-            let dir = dir.into_path().map_err(|e| AppError::Other(e.to_string()))?;
+            let dir = dir
+                .into_path()
+                .map_err(|e| AppError::Other(e.to_string()))?;
             let target = dir.join(format!("hourmint-export-{stamp}"));
             state.with_db(|c| export::export_csv_dir(c, &target))?;
             Ok(Some(target.to_string_lossy().into_owned()))
@@ -467,12 +576,16 @@ pub fn data_info(app: AppHandle, state: S) -> AppResult<DataInfo> {
 
 #[tauri::command]
 pub fn reveal_path(path: String) -> AppResult<()> {
-    tauri_plugin_opener::reveal_item_in_dir(PathBuf::from(path)).map_err(|e| AppError::Other(e.to_string()))
+    tauri_plugin_opener::reveal_item_in_dir(PathBuf::from(path))
+        .map_err(|e| AppError::Other(e.to_string()))
 }
 
 #[tauri::command]
 pub async fn backup_to_file(app: AppHandle, state: S<'_>) -> AppResult<Option<String>> {
-    let name = format!("hourmint-backup-{}.sqlite", chrono::Local::now().format("%Y-%m-%d-%H%M"));
+    let name = format!(
+        "hourmint-backup-{}.sqlite",
+        chrono::Local::now().format("%Y-%m-%d-%H%M")
+    );
     let Some(path) = save_dialog(&app, &name, "Hourmint backup", "sqlite")? else {
         return Ok(None);
     };
@@ -483,10 +596,10 @@ pub async fn backup_to_file(app: AppHandle, state: S<'_>) -> AppResult<Option<St
 #[tauri::command]
 pub fn backup_now(state: S) -> AppResult<String> {
     std::fs::create_dir_all(&state.paths.backup_dir)?;
-    let path = state
-        .paths
-        .backup_dir
-        .join(format!("hourmint-manual-{}.sqlite", chrono::Local::now().format("%Y%m%d-%H%M%S")));
+    let path = state.paths.backup_dir.join(format!(
+        "hourmint-manual-{}.sqlite",
+        chrono::Local::now().format("%Y%m%d-%H%M%S")
+    ));
     state.with_db(|c| db::backup_to(c, &path))?;
     Ok(path.to_string_lossy().into_owned())
 }
@@ -511,10 +624,10 @@ pub async fn restore_backup(app: AppHandle, state: S<'_>, path: Option<String>) 
     db::validate_backup_file(&src)?;
     // Safety copy of the current data before overwriting it.
     std::fs::create_dir_all(&state.paths.backup_dir)?;
-    let safety = state
-        .paths
-        .backup_dir
-        .join(format!("hourmint-pre-restore-{}.sqlite", chrono::Local::now().format("%Y%m%d-%H%M%S")));
+    let safety = state.paths.backup_dir.join(format!(
+        "hourmint-pre-restore-{}.sqlite",
+        chrono::Local::now().format("%Y%m%d-%H%M%S")
+    ));
     state.with_db(|c| db::backup_to(c, &safety))?;
     state.with_db_mut(|c| db::restore_from(c, &src))?;
     *state.idle.lock().unwrap() = Default::default();
@@ -556,5 +669,8 @@ pub struct AppInfo {
 #[tauri::command]
 pub fn app_info() -> AppInfo {
     let direct = cfg!(feature = "direct");
-    AppInfo { distribution: if direct { "direct" } else { "appstore" }, updates: direct }
+    AppInfo {
+        distribution: if direct { "direct" } else { "appstore" },
+        updates: direct,
+    }
 }

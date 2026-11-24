@@ -34,9 +34,19 @@ fn clock_icon(size: u32, running: bool) -> Vec<u8> {
                 (stroke / 2.0 - (d - (r_outer - stroke / 2.0)).abs() + 0.5).clamp(0.0, 1.0)
             };
             let h1 = hand(x, y, 0.0, -1.0, size as f32 * 0.28);
-            let h2 = hand(x, y, std::f32::consts::FRAC_1_SQRT_2, std::f32::consts::FRAC_1_SQRT_2, size as f32 * 0.2);
+            let h2 = hand(
+                x,
+                y,
+                std::f32::consts::FRAC_1_SQRT_2,
+                std::f32::consts::FRAC_1_SQRT_2,
+                size as f32 * 0.2,
+            );
             let hands = (stroke / 2.0 - h1.min(h2) + 0.5).clamp(0.0, 1.0);
-            a = if running { a * (1.0 - hands) } else { a.max(hands) };
+            a = if running {
+                a * (1.0 - hands)
+            } else {
+                a.max(hands)
+            };
             let i = ((yi * size + xi) * 4) as usize;
             px[i + 3] = (a * 255.0) as u8;
         }
@@ -58,7 +68,10 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
     let open = MenuItem::with_id(app, "open", "Open Hourmint", true, None::<&str>)?;
     let toggle = MenuItem::with_id(app, "toggle", "Start / Stop Timer", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit Hourmint", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&open, &toggle, &PredefinedMenuItem::separator(app)?, &quit])?;
+    let menu = Menu::with_items(
+        app,
+        &[&open, &toggle, &PredefinedMenuItem::separator(app)?, &quit],
+    )?;
 
     TrayIconBuilder::with_id(TRAY_ID)
         .icon(icon(false))
@@ -73,7 +86,13 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {
-            if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, rect, .. } = event {
+            if let TrayIconEvent::Click {
+                button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
+                rect,
+                ..
+            } = event
+            {
                 crate::windows::toggle_popover(tray.app_handle(), Some(rect));
             }
         })
@@ -85,7 +104,9 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
 static LAST_TITLE: std::sync::Mutex<Option<(String, String)>> = std::sync::Mutex::new(None);
 
 pub fn refresh(app: &AppHandle) {
-    let Some(tray) = app.tray_by_id(TRAY_ID) else { return };
+    let Some(tray) = app.tray_by_id(TRAY_ID) else {
+        return;
+    };
     let running = app.state::<AppState>().running.lock().unwrap().clone();
     let (title, tooltip) = match running {
         Some(r) => (
@@ -98,7 +119,11 @@ pub fn refresh(app: &AppHandle) {
     if last.as_ref() == Some(&(title.clone(), tooltip.clone())) {
         return;
     }
-    let _ = tray.set_title(if title.is_empty() { None } else { Some(title.as_str()) });
+    let _ = tray.set_title(if title.is_empty() {
+        None
+    } else {
+        Some(title.as_str())
+    });
     let _ = tray.set_tooltip(Some(tooltip.as_str()));
     *last = Some((title, tooltip));
 }

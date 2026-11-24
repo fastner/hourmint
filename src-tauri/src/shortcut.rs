@@ -45,7 +45,11 @@ pub fn toggle_timer(app: &AppHandle) {
             Some(project_id) => {
                 entries::start_timer(
                     c,
-                    &StartTimerInput { project_id, description: String::new(), billable: true },
+                    &StartTimerInput {
+                        project_id,
+                        description: String::new(),
+                        billable: true,
+                    },
                     time::now(),
                 )?;
                 Ok(true)
